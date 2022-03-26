@@ -6,6 +6,8 @@ use core::fmt::Write;
 use cortex_m_rt::entry;
 
 use defmt::info;
+use embedded_graphics::image::{Image, ImageRaw};
+use embedded_graphics::pixelcolor::Rgb565;
 use embedded_time::rate::Extensions;
 use embedded_time::{duration::*, Clock};
 
@@ -19,14 +21,10 @@ use rp_pico::hal;
 
 use defmt_rtt as _;
 
-use embedded_graphics::{
-    mono_font::{ascii::FONT_9X18_BOLD, MonoTextStyleBuilder},
-    pixelcolor::BinaryColor,
-    prelude::*,
-    text::{Baseline, Text},
-};
+use embedded_graphics::prelude::*;
 
 use ssd1306::{prelude::*, Ssd1306};
+use tinybmp::Bmp;
 
 #[entry]
 fn main() -> ! {
@@ -80,83 +78,27 @@ fn main() -> ! {
         .into_buffered_graphics_mode();
     display.init().unwrap();
 
-    // Create a text style for drawing the font:
-    let text_style = MonoTextStyleBuilder::new()
-        .font(&FONT_9X18_BOLD)
-        .text_color(BinaryColor::On)
-        .build();
-
     let timer = hal::Timer::new(pac.TIMER, &mut pac.RESETS);
     let mut delay = timer.count_down();
 
-    let mut count = 0;
+    let bmp = Bmp::from_slice(include_bytes!("./logo.bmp")).expect("Failed to load BMP image");
 
-    let mut buf = FmtBuf::new();
+    let mut y = 0;
+    let mut up = false;
     loop {
-        buf.reset();
-        // Format some text into a static buffer:
-        write!(&mut buf, "counter: {}", count).unwrap();
-        count += 1;
-
-        // Empty the display:
-        display.clear();
-
-        // Draw 3 lines of text:
-        Text::with_baseline("Hello world!", Point::zero(), text_style, Baseline::Top)
-            .draw(&mut display)
-            .unwrap();
-
-        Text::with_baseline("Hello Rust!", Point::new(0, 16), text_style, Baseline::Top)
-            .draw(&mut display)
-            .unwrap();
-
-        Text::with_baseline(buf.as_str(), Point::new(0, 32), text_style, Baseline::Top)
-            .draw(&mut display)
-            .unwrap();
-
+        let im: Image<Bmp<Rgb565>> = Image::new(&bmp, Point::new(0, y));
+        im.draw(&mut display.color_converted()).unwrap();
         display.flush().unwrap();
-
-        // Wait a bit:
-        // delay.start(50.milliseconds());
-        // let _ = nb::block!(delay.wait());
-    }
-}
-
-/// This is a very simple buffer to pre format a short line of text
-/// limited arbitrarily to 64 bytes.
-struct FmtBuf {
-    buf: [u8; 64],
-    ptr: usize,
-}
-
-impl FmtBuf {
-    fn new() -> Self {
-        Self {
-            buf: [0; 64],
-            ptr: 0,
+        if y == -70 || y == 0 {
+            delay.start(5.seconds());
+            let _ = nb::block!(delay.wait());
+            up = !up;
+        }
+        info!("y = {}", y);
+        if up {
+            y -= 1;
+        } else {
+            y += 1;
         }
     }
-
-    fn reset(&mut self) {
-        self.ptr = 0;
-    }
-
-    fn as_str(&self) -> &str {
-        core::str::from_utf8(&self.buf[0..self.ptr]).unwrap()
-    }
 }
-
-impl core::fmt::Write for FmtBuf {
-    fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        let rest_len = self.buf.len() - self.ptr;
-        let len = if rest_len < s.len() {
-            rest_len
-        } else {
-            s.len()
-        };
-        self.buf[self.ptr..(self.ptr + len)].copy_from_slice(&s.as_bytes()[0..len]);
-        self.ptr += len;
-        Ok(())
-    }
-}
-

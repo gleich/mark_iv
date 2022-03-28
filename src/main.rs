@@ -78,12 +78,11 @@ fn main() -> ! {
 		let im: Image<Bmp<Rgb565>> = Image::new(&bmp, Point::new(0, y));
 		im.draw(&mut display.color_converted()).unwrap();
 		display.flush().unwrap();
-		if y == -70 || y == 0 {
+		if y == -55 || y == 0 {
 			delay.start(5.seconds());
 			let _ = nb::block!(delay.wait());
 			up = !up;
 		}
-		info!("y = {}", y);
 		if up {
 			y -= 1;
 		} else {

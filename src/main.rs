@@ -2,7 +2,6 @@
 #![no_main]
 
 use cortex_m_rt::entry;
-use defmt::info;
 use embedded_graphics::image::Image;
 use embedded_graphics::pixelcolor::Rgb565;
 use embedded_graphics::prelude::*;
